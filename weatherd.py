@@ -59,7 +59,7 @@ def update_wu(readings):
 	    result = urllib.urlopen(wu_uri + "?%s" % params)	
 	    print result.read()
 
-proc = subprocess.Popen('/home/pi/rtl_433/build/src/rtl_433', stdout=subprocess.PIPE,)
+proc = subprocess.Popen('/home/pi/rtl_433/build/src/rtl_433', stdout=subprocess.PIPE)
 
 msgid_re = re.compile('(\d*-\d*-\d* \d*:\d*:\d*) Acurite 5n1 sensor (0x.{0,4}) Ch ([ABC]), Msg (\d\d)')
 msg38_re = re.compile('.*Msg 38, Wind (\d+\.?\d*) kmph \/ (\d+\.?\d*) mph, ([\+\-]?\d+\.?\d*) C ([\+\-]?\d+\.?\d*) F (\d+\.?\d*) % RH')
@@ -70,9 +70,10 @@ got_msg31=False
 got_msg38=False
 rain_total = 0.0
 rain_hour = 0.0
+rain_day = 0.0
 weather = Sensor()
 cur_hour = datetime.time.hour
-cur_day = datetime.time.day
+cur_day = datetime.date.day
 
 while(1):
 	line = proc.stdout.readline()
@@ -98,22 +99,24 @@ while(1):
 			
 			#handle hourly rain
 			if (cur_hour != datetime.time.hour):
-		        cur_hour = datetime.time.hour
-		        rain_hour = 0.0;
+				cur_hour = datetime.time.hour
+				rain_hour = 0.0
 		    
 			rain_hour = rain_hour + cur_rain
 			weather.rain_in = rain_hour
 			
-			if (cur_day != datetime.time.day)
-			    cur_day = datetime.time.day
-			    rain_day = 0.0
+			if (cur_day != datetime.date.day):
+				cur_day = datetime.date.day
+				rain_day = 0.0
+			
 			rain_day = rain_day + cur_rain
+			weather.daily_rain_in = rain_day
 			rain_total = rain_total + cur_rain
 		else:
-		    so = startup_re.match(line)
-		    if (so is not None):
-		        rain_total = float(so.group(1))
-			
+			so = startup_re.match(line)
+			if (so is not None):
+				rain_total = float(so.group(1))
+				print "Got total rain of %1.3f in" % rain_total
 
 	if (got_msg38 and got_msg31):
 		print("Wind %1.3f mph, %1.3f F, %f" %(weather.wind_mph, weather.temp_f, weather.rh_pct))
