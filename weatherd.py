@@ -61,10 +61,12 @@ proc = subprocess.Popen('/home/pi/rtl_433/build/src/rtl_433', stdout=subprocess.
 msgid_re = re.compile('(\d*-\d*-\d* \d*:\d*:\d*) Acurite 5n1 sensor (0x.{0,4}) Ch ([ABC]), Msg (\d\d)')
 msg38_re = re.compile('.*Msg 38, Wind (\d+\.?\d*) kmph \/ (\d+\.?\d*) mph, ([\+\-]?\d+\.?\d*) C ([\+\-]?\d+\.?\d*) F (\d+\.?\d*) % RH')
 msg31_re = re.compile('.*Msg 31, Wind (\d+\.?\d*) kmph \/ (\d+\.?\d*) mph (\d+\.?\d*).*rain gauge (\d+\.?\d*) in\.', flags=re.UNICODE)
-
+startup_re = re.compile('.*Msg 31, Total rain fall since last reset: (\d+\.?\d*)')
 
 got_msg31=False
 got_msg38=False
+rain_total = 0.0
+rain_hour = 0.0
 weather = Sensor()
 
 while(1):
@@ -88,6 +90,12 @@ while(1):
 			weather.wind_mph = float(msg31mo.group(1))
 			weather.winddir_deg = float(msg31mo.group(3))
 			weather.rain_in = float(msg31mo.group(4)) #inches rain since last message
+			rain_hour = rain_hour + weather.rain_in
+			rain_total = rain_total + weather.rain_in
+		else:
+		    so = startup_re.match(line)
+		    if (so is not None):
+		        rain_total = float(so.group(1))
 			
 
 	if (got_msg38 and got_msg31):
