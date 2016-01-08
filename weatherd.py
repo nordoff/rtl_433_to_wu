@@ -1,4 +1,4 @@
-#!/bin/python
+#!/usr/bin/python
 
 import subprocess
 import os
@@ -13,7 +13,7 @@ import argparse
 parser = argparse.ArgumentParser(description='Weatherunderground updater')
 parser.add_argument('--id','-i', dest='id', help='station id/username')
 parser.add_argument('--password','-p',dest='pw', help='weatherunderground password')
-parser.add_argument('--test','t',action='store_true',dest='testonly',help='dry run, only print GET string')
+parser.add_argument('--test','-t',action='store_true',dest='testonly',help='dry run, only print GET string')
 args = parser.parse_args()
 
 
@@ -52,9 +52,9 @@ def update_wu(readings):
 
 	if (args.testonly):
 	    print params
-	else
+	else:
 	    result = urllib.urlopen(wu_uri + "?%s" % params)	
-	    #print result.read()
+	    print result.read()
 
 proc = subprocess.Popen('/home/pi/rtl_433/build/src/rtl_433', stdout=subprocess.PIPE,)
 
@@ -91,7 +91,7 @@ while(1):
 			
 
 	if (got_msg38 and got_msg31):
-	    print("Wind %1.3f mph, %1.3f F, %f" %(weather.wind_mph, weather.temp_f, weather.rh_pct))
+		print("Wind %1.3f mph, %1.3f F, %f" %(weather.wind_mph, weather.temp_f, weather.rh_pct))
 		print("Wind %3.1f mph, dir %03.1f deg, Rain %1.2f" % (weather.wind_mph, weather.winddir_deg, weather.rain_in))
 		got_msg31=False
 		got_msg38=False
