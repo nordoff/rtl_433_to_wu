@@ -12,7 +12,7 @@ Installation
 * [USB RTL receiver](http://www.rtl-sdr.com/buy-rtl-sdr-dvb-t-dongles/) (also available on amazon)  
 
 *Software*
-* [rtl_433](https://github.com/merbanan/rtl_433to be installed.
+* [rtl_433](https://github.com/merbanan/rtl_433) to be installed.
 * rtl_433 requires [rtl-sdr](http://sdr.osmocom.org/trac/wiki/rtl-sdr)
 
 Other information
