@@ -78,8 +78,8 @@ rain_total = Decimal(0.0)
 rain_hour = Decimal(0.0)
 rain_day = Decimal(0.0)
 weather = Sensor()
-cur_hour = datetime.time.hour
-cur_day = datetime.date.day
+cur_hour = datetime.datetime.today().hour
+cur_day = datetime.datetime.today().day
 times = 0
 cur_rain = Decimal(0.0)
 
@@ -108,18 +108,18 @@ while(1):
 				cur_rain = Decimal(msg31mo.group(4)) - rain_total #inches rain since last message
 				
 				#handle hourly rain
-				if (cur_hour != datetime.time.hour):
+				if (cur_hour != datetime.datetime.today().hour):
 					print("%s Resetting hourly rain total, was %1.1f" % (weather.timestamp, rain_hour))
-					cur_hour = datetime.time.hour
+					cur_hour = datetime.datetime.today().hour
 					rain_hour = Decimal(0.0)
 		    
 				rain_hour += cur_rain
 				weather.rain_in = rain_hour
 			
 				#handle daily rain
-				if (cur_day != datetime.date.day):
+				if (cur_day != datetime.datetime.today().day):
 					print("%s Resetting daily rain total, was %1.1f" % (weather.timestamp, rain_day))
-					cur_day = datetime.date.day
+					cur_day = datetime.datetime.today().day
 					rain_day = Decimal(0.0)
 			
 				rain_day = rain_day + cur_rain
@@ -142,4 +142,3 @@ while(1):
 		update_wu(weather)
 		weather.reset()
 		cur_rain = Decimal(0.0)
-
