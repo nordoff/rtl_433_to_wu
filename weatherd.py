@@ -10,14 +10,24 @@ import urllib
 import argparse
 import datetime
 import math
+import logging
+import ConfigParser
+import Daemon
 
 from decimal import Decimal
 
-parser = argparse.ArgumentParser(description='Weatherunderground updater')
-parser.add_argument('--id','-i', dest='id', help='station id/username')
-parser.add_argument('--password','-p',dest='pw', help='weatherunderground password')
-parser.add_argument('--test','-t',action='store_true',dest='testonly',help='dry run, only print GET string')
-args = parser.parse_args()
+config = ConfigParser.ConfigParser()
+config.read('weather.ini')
+
+logger = logging.getLogger("weatherd")
+logging.basicConfig(filename = 'weatherd.log', level=logging.INFO)
+
+
+#parser = argparse.ArgumentParser(description='Weatherunderground updater')
+#parser.add_argument('--id','-i', dest='id', help='station id/username')
+#parser.add_argument('--password','-p',dest='pw', help='weatherunderground password')
+#parser.add_argument('--test','-t',action='store_true',dest='testonly',help='dry run, only print GET string')
+#args = parser.parse_args()
 
 
 wu_uri = 'http://rtupdate.wunderground.com/weatherstation/updateweatherstation.php'
@@ -40,105 +50,135 @@ class Sensor:
 		self.timestamp = None
 
 def update_wu(readings):
-	params = urllib.urlencode({
-		'action':'updateraw',
-		'ID':args.id,
-		'PASSWORD':args.pw,
-		'dateutc':readings.timestamp,
-		'winddir':readings.winddir_deg,
-		'windspeedmph':readings.wind_mph,
-		'humidity':readings.rh_pct,
-		'tempf':readings.temp_f,
-		'rainin':readings.rain_in, #rain in last hour
-		'dailyrainin':readings.rain_daily_in, #rain in last day
-		#'baromin':29.92,
-		#dewpt eq from http://andrew.rsmas.miami.edu/bmcnoldy/Humidity.html
-		'dewptf':243.04*(math.log(readings.rh_pct/100)+((17.625*readings.temp_f)/(243.04+readings.temp_f)))/(17.625-math.log(readings.rh_pct/100)-((17.625*readings.temp_f)/(243.04+readings.temp_f))),
-		'softwaretype':'rtl_433_to_wu'})
-
-	if (args.testonly):
-	    print params
-	else:
-		try:
-	    		result = urllib.urlopen(wu_uri + "?%s" % params)	
-	    		print result.read()
-		except IOError as e:
-			print "IO Error: ", e.strerror
-
-proc = subprocess.Popen(['/home/pi/rtl_433/build/src/rtl_433','-R','39'], stdout=subprocess.PIPE)
-
-msgid_re = re.compile('(\d*-\d*-\d* \d*:\d*:\d*) Acurite 5n1 sensor (0x.{0,4}) Ch ([ABC]), Msg (\d\d)')
-msg38_re = re.compile('.*Msg 38, Wind (\d+\.?\d*) kmph \/ (\d+\.?\d*) mph, ([\+\-]?\d+\.?\d*) C ([\+\-]?\d+\.?\d*) F (\d+\.?\d*) % RH')
-msg31_re = re.compile('.*Msg 31, Wind (\d+\.?\d*) kmph \/ (\d+\.?\d*) mph (\d+\.?\d*).*rain gauge (\d+\.?\d*) in\.', flags=re.UNICODE)
-startup_re = re.compile('.*Msg 31, Total rain fall since last reset: (\d+\.?\d*)')
-
-got_msg31=False
-got_msg38=False
-rain_total = Decimal(0.0)
-rain_hour = Decimal(0.0)
-rain_day = Decimal(0.0)
-weather = Sensor()
-cur_hour = datetime.datetime.today().hour
-cur_day = datetime.datetime.today().day
-times = 0
-cur_rain = Decimal(0.0)
-
-while(1):
-	line = proc.stdout.readline()
-	msgobj = msgid_re.match(line)
-	if(msgobj):
-		#print("%s MsgId %s" % (msgobj.group(1), msgobj.group(4)))
-		if int(msgobj.group(4)) == 38:
-			msg38mo = msg38_re.match(line)
-			if (msg38mo != None):
-				got_msg38=True
-				weather.timestamp = msgobj.group(1)
-				weather.wind_mph = float(msg38mo.group(2))
-				weather.temp_f = float(msg38mo.group(4))
-				weather.rh_pct = float(msg38mo.group(5))
-			
-
-		elif int(msgobj.group(4)) == 31:
-			msg31mo = msg31_re.match(line)
-			if (msg31mo != None):
-				got_msg31=True
-				weather.timestamp = msgobj.group(1)
-				weather.wind_mph = float(msg31mo.group(1))
-				weather.winddir_deg = float(msg31mo.group(3))
-				cur_rain = Decimal(msg31mo.group(4)) - rain_total #inches rain since last message
-				
-				#handle hourly rain
-				if (cur_hour != datetime.datetime.today().hour):
-					print("%s Resetting hourly rain total, was %1.1f" % (weather.timestamp, rain_hour))
-					cur_hour = datetime.datetime.today().hour
-					rain_hour = Decimal(0.0)
-		    
-				rain_hour += cur_rain
-				weather.rain_in = rain_hour
-			
-				#handle daily rain
-				if (cur_day != datetime.datetime.today().day):
-					print("%s Resetting daily rain total, was %1.1f" % (weather.timestamp, rain_day))
-					cur_day = datetime.datetime.today().day
-					rain_day = Decimal(0.0)
-			
-				rain_day = rain_day + cur_rain
-				weather.rain_daily_in = rain_day
-
-				#total rain
-				rain_total += cur_rain
+	logger.debug("update_wu [in]")
+	try:
+		params = urllib.urlencode({
+			'action':'updateraw',
+			'ID':config.get('station','id'),
+			'PASSWORD':config.get('station','pw'),
+			'dateutc':readings.timestamp,
+			'winddir':readings.winddir_deg,
+			'windspeedmph':readings.wind_mph,
+			'humidity':readings.rh_pct,
+			'tempf':readings.temp_f,
+			'rainin':readings.rain_in, #rain in last hour
+			'dailyrainin':readings.rain_daily_in, #rain in last day
+			#'baromin':29.92,
+			#dewpt eq from http://andrew.rsmas.miami.edu/bmcnoldy/Humidity.html
+			'dewptf':243.04*(math.log(readings.rh_pct/100)+((17.625*readings.temp_f)/(243.04+readings.temp_f)))/(17.625-math.log(readings.rh_pct/100)-((17.625*readings.temp_f)/(243.04+readings.temp_f))),
+			'softwaretype':'rtl_433_to_wu'})
+	
+		logger.debug(params)
+		if (not config.get('station', 'test', False)):
+			try:
+	    			result = urllib.urlopen(wu_uri + "?%s" % params)	
+	    			logger.info(result.read())
+			except IOError as e:
+				logger.error("IO Error: %s", e.strerror)
 		else:
-			#total rain at startup
-			so = startup_re.match(line)
-			if (so is not None):
-				rain_total = Decimal(so.group(1))
-				print "%s Got total rain of %1.3f in" % (datetime.datetime.now(), rain_total)
+			logger.debug("Skipping GET of URL for test mode")
+	except ConfigParser.NoSectionError:
+		logger.error("Missing config section")
+	except Exception as e:
+		logger.error(e.strerror)
 
-	if (got_msg38 and got_msg31):
-		print("%s Wind %1.1f mph, dir %03.1f deg, %1.3f F, RH %1.1f%%, Rain (last) %1.2f in, (1hr) %1.2f in, (1day) %1.2f in" %(weather.timestamp, weather.wind_mph, weather.winddir_deg, weather.temp_f, weather.rh_pct, cur_rain, weather.rain_in, weather.rain_daily_in))
-		#print("rain_hour %1.2f, rain_day %1.2f, rain_total %1.2f" % (rain_hour, rain_day, rain_total))
+
+class WeatherD(Daemon.Daemon):
+
+	def run(self):
+		logger.info("Starting weatherd")
+		proc = subprocess.Popen(['/home/pi/rtl_433/build/src/rtl_433','-R','39'], stdout=subprocess.PIPE)
+
+		msgid_re = re.compile('(\d*-\d*-\d* \d*:\d*:\d*) Acurite 5n1 sensor (0x.{0,4}) Ch ([ABC]), Msg (\d\d)')
+		msg38_re = re.compile('.*Msg 38, Wind (\d+\.?\d*) kmph \/ (\d+\.?\d*) mph, ([\+\-]?\d+\.?\d*) C ([\+\-]?\d+\.?\d*) F (\d+\.?\d*) % RH')
+		msg31_re = re.compile('.*Msg 31, Wind (\d+\.?\d*) kmph \/ (\d+\.?\d*) mph (\d+\.?\d*).*rain gauge (\d+\.?\d*) in\.', flags=re.UNICODE)
+		startup_re = re.compile('.*Msg 31, Total rain fall since last reset: (\d+\.?\d*)')
+
 		got_msg31=False
 		got_msg38=False
-		update_wu(weather)
-		weather.reset()
+		rain_total = Decimal(0.0)
+		rain_hour = Decimal(0.0)
+		rain_day = Decimal(0.0)
+		weather = Sensor()
+		cur_hour = datetime.datetime.today().hour
+		cur_day = datetime.datetime.today().day
+		times = 0
 		cur_rain = Decimal(0.0)
+
+		while(1):
+			line = proc.stdout.readline()
+			msgobj = msgid_re.match(line)
+			if(msgobj):
+				logger.debug("%s MsgId %s", msgobj.group(1), msgobj.group(4))
+				if int(msgobj.group(4)) == 38:
+					msg38mo = msg38_re.match(line)
+					if (msg38mo != None):
+						got_msg38=True
+						weather.timestamp = msgobj.group(1)
+						weather.wind_mph = float(msg38mo.group(2))
+						weather.temp_f = float(msg38mo.group(4))
+						weather.rh_pct = float(msg38mo.group(5))
+					
+
+				elif int(msgobj.group(4)) == 31:
+					msg31mo = msg31_re.match(line)
+					if (msg31mo != None):
+						got_msg31=True
+						weather.timestamp = msgobj.group(1)
+						weather.wind_mph = float(msg31mo.group(1))
+						weather.winddir_deg = float(msg31mo.group(3))
+						cur_rain = Decimal(msg31mo.group(4)) - rain_total #inches rain since last message
+						
+						#handle hourly rain
+						if (cur_hour != datetime.datetime.today().hour):
+							logger.info("%s Resetting hourly rain total, was %1.1f", weather.timestamp, rain_hour)
+							cur_hour = datetime.datetime.today().hour
+							rain_hour = Decimal(0.0)
+				    
+						rain_hour += cur_rain
+						weather.rain_in = rain_hour
+					
+						#handle daily rain
+						if (cur_day != datetime.datetime.today().day):
+							logger.info("%s Resetting daily rain total, was %1.1f",  weather.timestamp, rain_day)
+							cur_day = datetime.datetime.today().day
+							rain_day = Decimal(0.0)
+					
+						rain_day = rain_day + cur_rain
+						weather.rain_daily_in = rain_day
+
+						#total rain
+						rain_total += cur_rain
+				else:
+					#total rain at startup
+					so = startup_re.match(line)
+					if (so is not None):
+						rain_total = Decimal(so.group(1))
+						logger.info("%s Got total rain of %1.3f in", datetime.datetime.now(), rain_total)
+
+			if (got_msg38 and got_msg31):
+				logger.info("%s Wind %1.1f mph, dir %03.1f deg, %1.3f F, RH %1.1f%%, Rain (last) %1.2f in, (1hr) %1.2f in, (1day) %1.2f in", weather.timestamp, weather.wind_mph, weather.winddir_deg, weather.temp_f, weather.rh_pct, cur_rain, weather.rain_in, weather.rain_daily_in)
+				got_msg31=False
+				got_msg38=False
+				logger.debug("Updating weather")
+				update_wu(weather)
+				logger.debug("Weather updated")
+				weather.reset()
+				cur_rain = Decimal(0.0)
+
+if __name__ == "__main__":
+        daemon = WeatherD('/tmp/weatherd.pid')
+        if len(sys.argv) == 2:
+                if 'start' == sys.argv[1]:
+                        daemon.start()
+                elif 'stop' == sys.argv[1]:
+                        daemon.stop()
+                elif 'restart' == sys.argv[1]:
+                        daemon.restart()
+                else:
+                        print "Unknown command"
+                        sys.exit(2)
+                sys.exit(0)
+        else:
+                print "usage: %s start|stop|restart" % sys.argv[0]
+                sys.exit(2)

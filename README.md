@@ -3,7 +3,7 @@ rtl_433_to_wu
 
 Convert rtl_433 output to weatherunderground updates
 
-This is a simple script that listens to the output of your Acurite 5-n-1 weather sensor and uploads it to weatherunderground.com.
+This is a simple service that listens to the output of your Acurite 5-n-1 weather sensor and uploads it to weatherunderground.com.
 
 Installation
 ------------
@@ -22,16 +22,12 @@ The rainfall totals are sawtooth counts, that is, the total accumulates from the
 
 How to use
 ----------
-This is not a proper service - I usually just kick it off with nohup:
-    `nohup weatherd.py -i MYSTATION -p mypasswd`
+Softlink weatherd.py to your service directory: /etc/init.d/ or wherever
+it runs with `weatherd.py start|stop|restart`
+Requres a configuration file named weather.ini containing the following
 ```
-usage: weatherd.py [-h] [--id ID] [--password PW] [--test]
-
-Weather Underground updater
-
-optional arguments:
-  -h, --help            show this help message and exit
-  --id ID, -i ID        station id/username
-  --password PW, -p PW  weatherunderground password
-  --test, -t            dry run, only print GET string
+[station]
+id=your_station_id
+pw=station_pw
+test=True|False ;set to true to simply print the URI string
 ```
