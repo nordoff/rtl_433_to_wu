@@ -17,10 +17,10 @@ import Daemon
 from decimal import Decimal
 
 config = ConfigParser.ConfigParser()
-config.read('weather.ini')
+config.read('/etc/weather.ini')
 
 logger = logging.getLogger("weatherd")
-logging.basicConfig(filename = 'weatherd.log', level=logging.INFO)
+logging.basicConfig(filename = '/var/log/weatherd.log', level=logging.INFO)
 
 
 #parser = argparse.ArgumentParser(description='Weatherunderground updater')
