@@ -1,0 +1,4 @@
+[station]
+id=YOUR_STATION_ID_ALL_CAPS
+pw=yourpassword
+test=False
