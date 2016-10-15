@@ -3,7 +3,7 @@ rtl_433_to_wu
 
 Convert rtl_433 output to weatherunderground updates
 
-This is a simple service that listens to the output of your Acurite 5-n-1 weather sensor and uploads it to weatherunderground.com.
+This is a simple service that listens to the output of your Acurite 5-n-1 weather sensor and uploads it to weatherunderground.com. You can find one on [amazon](https://www.amazon.com/AcuRite-06004RM-Direction-Temperature-Humidity/dp/B00T0K8MNI/ref=sr_1_23?s=furniture&srs=11102085011&ie=UTF8&qid=1476489637&sr=1-23), sometimes Costco has a 5n1 with a display for cheaper.
 
 Installation
 ------------
@@ -24,10 +24,10 @@ How to use
 ----------
 Softlink weatherd.py to your service directory: /etc/init.d/ or wherever
 it runs with `weatherd.py start|stop|restart`
-Requres a configuration file named weather.ini containing the following
+Requres a configuration file named weather.ini in /etc/ containing the following
 ```
 [station]
-id=your_station_id
+id=your_station_id (This should be ALL CAPS)
 pw=station_pw
 test=True|False ;set to true to simply print the URI string
 ```
