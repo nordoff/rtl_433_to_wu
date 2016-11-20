@@ -69,7 +69,7 @@ def update_wu(readings):
 			'softwaretype':'rtl_433_to_wu'})
 	
 		logger.debug(params)
-		if (not config.get('station', 'test', False)):
+		if (not config.has_option('station','test') or config.getboolean('station', 'test') == False):
 			try:
 	    			result = urllib.urlopen(wu_uri + "?%s" % params)	
 	    			logger.info(result.read())
@@ -77,6 +77,7 @@ def update_wu(readings):
 				logger.error("IO Error: %s", e.strerror)
 		else:
 			logger.debug("Skipping GET of URL for test mode")
+			logger.info(wu_uri + "?%s" % params)
 	except ConfigParser.NoSectionError:
 		logger.error("Missing config section")
 	except Exception as e:

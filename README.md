@@ -22,8 +22,8 @@ The rainfall totals are sawtooth counts, that is, the total accumulates from the
 
 How to use
 ----------
-Softlink weatherd.py to your service directory: /etc/init.d/ or wherever
-it runs with `weatherd.py start|stop|restart`
+Softlink weatherd to your service directory: /etc/init.d/ or wherever. Make sure the path in it points to wherever you put your cloned folder
+it runs with `weatherd.py start|stop|restart` or `sudo service weatherd start|stop|restart`
 Requres a configuration file named weather.ini in /etc/ containing the following
 ```
 [station]
