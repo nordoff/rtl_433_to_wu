@@ -13,6 +13,7 @@ import math
 import logging
 import ConfigParser
 import Daemon
+import json
 
 from decimal import Decimal
 
@@ -88,7 +89,7 @@ class WeatherD(Daemon.Daemon):
 
 	def run(self):
 		logger.info("Starting weatherd")
-		proc = subprocess.Popen(['/home/pi/rtl_433/build/src/rtl_433','-R','39'], stdout=subprocess.PIPE)
+		proc = subprocess.Popen(['/usr/local/bin/rtl_433','-M','newmodel','-F','json','-C','customary'], stdout=subprocess.PIPE)
 
 		msgid_re = re.compile('(\d*-\d*-\d* \d*:\d*:\d*) Acurite 5n1 sensor (0x.{0,4}) Ch ([ABC]), Msg (\d\d)')
 		msg38_re = re.compile('.*Msg 38, Wind (\d+\.?\d*) kmph \/ (\d+\.?\d*) mph, ([\+\-]?\d+\.?\d*) C ([\+\-]?\d+\.?\d*) F (\d+\.?\d*) % RH')
@@ -105,51 +106,53 @@ class WeatherD(Daemon.Daemon):
 		cur_day = datetime.datetime.today().day
 		times = 0
 		cur_rain = Decimal(0.0)
+		at_startup=True
 
 		while(1):
 			line = proc.stdout.readline()
-			msgobj = msgid_re.match(line)
-			if(msgobj):
-				logger.debug("%s MsgId %s", msgobj.group(1), msgobj.group(4))
-				if int(msgobj.group(4)) == 38:
-					msg38mo = msg38_re.match(line)
-					if (msg38mo != None):
-						got_msg38=True
-						weather.timestamp = msgobj.group(1)
-						weather.wind_mph = float(msg38mo.group(2))
-						weather.temp_f = float(msg38mo.group(4))
-						weather.rh_pct = float(msg38mo.group(5))
+			msg = json.loads(line)
+			if msg['model']=='Acurite-5n1':
+				msgType = int(msg['message_type'])
+				logger.debug("%s MsgId %s", msg['model'], msg['message_type'])
+				if msgType == 56:
+					got_msg38=True
+					weather.timestamp = msg['time']
+					weather.wind_mph = float(msg['wind_avg_mi_h'])
+					weather.temp_f = float(msg['temperature_F'])
+					weather.rh_pct = float(msg['humidity'])
 					
 
-				elif int(msgobj.group(4)) == 31:
-					msg31mo = msg31_re.match(line)
-					if (msg31mo != None):
-						got_msg31=True
-						weather.timestamp = msgobj.group(1)
-						weather.wind_mph = float(msg31mo.group(1))
-						weather.winddir_deg = float(msg31mo.group(3))
-						cur_rain = Decimal(msg31mo.group(4)) - rain_total #inches rain since last message
+				elif msgType == 49:
+				
+					got_msg31=True
+					weather.timestamp = msg['time']
+					weather.wind_mph = float(msg['wind_avg_mi_h'])
+					weather.winddir_deg = float(msg['wind_dir_deg'])
+					if at_startup:
+						rain_total = Decimal(msg['rain_in'])
+						at_startup = False
+					cur_rain = Decimal(msg['rain_in']) - rain_total #inches rain since last message
 						
-						#handle hourly rain
-						if (cur_hour != datetime.datetime.today().hour):
-							logger.info("%s Resetting hourly rain total, was %1.1f", weather.timestamp, rain_hour)
-							cur_hour = datetime.datetime.today().hour
-							rain_hour = Decimal(0.0)
-				    
-						rain_hour += cur_rain
-						weather.rain_in = rain_hour
-					
-						#handle daily rain
-						if (cur_day != datetime.datetime.today().day):
-							logger.info("%s Resetting daily rain total, was %1.1f",  weather.timestamp, rain_day)
-							cur_day = datetime.datetime.today().day
-							rain_day = Decimal(0.0)
-					
-						rain_day = rain_day + cur_rain
-						weather.rain_daily_in = rain_day
+					#handle hourly rain
+					if (cur_hour != datetime.datetime.today().hour):
+						logger.info("%s Resetting hourly rain total, was %1.1f", weather.timestamp, rain_hour)
+						cur_hour = datetime.datetime.today().hour
+						rain_hour = Decimal(0.0)
+			    
+					rain_hour += cur_rain
+					weather.rain_in = rain_hour
+				
+					#handle daily rain
+					if (cur_day != datetime.datetime.today().day):
+						logger.info("%s Resetting daily rain total, was %1.1f",  weather.timestamp, rain_day)
+						cur_day = datetime.datetime.today().day
+						rain_day = Decimal(0.0)
+				
+					rain_day = rain_day + cur_rain
+					weather.rain_daily_in = rain_day
 
-						#total rain
-						rain_total += cur_rain
+					#total rain
+					rain_total += cur_rain
 				else:
 					#total rain at startup
 					so = startup_re.match(line)
